@@ -4,7 +4,6 @@
 # Handy: https://www.airpair.com/python/posts/using-python-and-qgis-for-geospatial-visualization
 
 import dateutil.parser
-#from itertools import chain
 from urllib import urlopen
 import re
 import string
@@ -61,11 +60,11 @@ def find_next_td_of_sighting_property(soup, sighting_property, to_find='td', pat
         'Description'
     ]
     pattern_re = re.compile(pattern.format(sighting_property))
-    #print "Searching", to_find, pattern.format(sighting_property), '\n'
     results = soup.find(to_find, text=pattern_re)
     if results is None:
 
         # Try a variety of corner cases
+        # TODO Make this cleaner
 
         # Sometimes it's "special"
         if sighting_property == 'Features/characteristics':
@@ -128,7 +127,6 @@ class UFOSighting(object):
         self.longitude = None
 
     def __str__(self):
-        #print self.__dict__
         text = '<0> UFOSighting <0>'
         for k, v in self.__dict__.items():
             text += '\n{k}: {v}'.format(k=k.title(),v=v)
@@ -168,12 +166,11 @@ class UFOSighting(object):
                 self.longitude = None
                 return False # Failure
 
-# For each year
 sightings = []
+
 for year in years:
+
     year = BeautifulSoup(urlopen(year['href']))
-    # Get all sightings tables, into a flat list, ideally with data structure
-    # Date, Time, Location, Features/Characteristics, Description
 
     for table in year.findAll('table', {'cellpadding': '3'}):
         date = find_next_td_of_sighting_property(table, 'Date')
@@ -200,13 +197,3 @@ ufos_df = pd.DataFrame(sightings, columns=['Date','Time','Location','Features','
 
 # Export to CSV
 ufos_df.to_csv('ufos_data.csv',index=False, encoding='utf-8')
-
-
-# # for year in all_years:
-# #     report_page = BeautifulSoup(urlopen(year))
-# #
-# #     # Extract all reports to a data structure
-# #     #print report_page
-# #     reports = report_page.findAll('tbody', {"style": "width: 618px;"})
-# #     print reports
-# #     exit(0)
