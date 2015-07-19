@@ -9,10 +9,13 @@ import re
 import string
 import os
 import itertools
+from HTMLParser import HTMLParser
 
 from BeautifulSoup import BeautifulSoup
+from unidecode import unidecode
 import pandas as pd
 from geopy.geocoders import Nominatim
+from geopy.exc import GeocoderTimedOut
 
 def handle_special_date_exception(date_string, exception):
     # There are several special cases
@@ -152,7 +155,7 @@ class UFOSighting(object):
                 return True
         return False
 
-    def geocode(self,bias='New Zealand',timeout=6,exactly_one=True):
+    def geocode(self,bias='New Zealand',timeout=6,exactly_one=True,debug=False):
         '''
         Updates self.latitude and self.longitude if a geocode is successsful;
         otherwise leaves them as the default (None_.
@@ -162,7 +165,54 @@ class UFOSighting(object):
         '''
         def substitutions_for_known_issues(locations):
             corrections = {'Coromandel Peninsula': 'Coromandel', # Nominatim doesn't like this
-                           'Whangaparoa': 'Whangaparaoa' # Pakeha-ism
+                           'Whangaparoa': 'Whangaparaoa', # Pakeha-ism
+                           'Pukekohe, Frankton': 'Pukekohe, Franklin', # There is no Pukekohe, Frankton
+                           'west Auckland': 'Henderson, Auckland', # Nominatim doesn't understand "West Auckland"
+                           'Waitakere City': 'Waitakere',
+                           'Taumaranui': 'Taumarunui',
+                           'Taumaranui, King Country': 'Taumarunui',
+                           'Otematata, Waitati Valley, North Otago': 'Otematata',
+                           'Takapuna Beach': 'Takapuna',
+                           'Golden Springs, Reporoa, Bay of Plenty': 'Reporoa',
+                           'Puketona Junction, south of Kerikeri, New Zealand': 'Te Ahu Ahu Road, New Zealand', # Manually checked
+                           'Ohinepaka, Wairoa': 'Kiwi Valley Road, Wairoa', # Ohinepaka not in OSM; this is nearest landmark
+                           'Gluepot Road, Oropi': 'Gluepot Road',
+                           'Rimutaka Ranges, Wairarapa': 'Rimutaka, Wairarapa',
+                           'Ashburton, Otago': 'Ashburton, Ashburton District', # Ashburton is not in Otago
+                           'National Park village, Central': 'National Park',
+                           'Mareawa, Napier': 'Marewa, Napier',
+                           'Clarence River mouth, Lower Marlborough,': 'Clarence',
+                           'Oputama, Mahia Peninsula': 'Opoutama, Mahia',
+                           'Taupo, Central': 'Taupo',
+                           'The Ureweras': 'Sister Annie Road, Whakatane',
+                           'Spray River': 'Waihopai Valley Road',
+                           'Viewed from Cambridge, but activity over Hamilton': 'Hamilton',
+                           'Cashmere Hills, Christchurch': 'Cashmere, Christchurch',
+                           'Wairarapa': 'Wellington', # NOTE: Nominatim does not understand 'Wairarapa',
+                           'Whangapoua Beach': 'Whangapoua',
+                           'Marychurch Rd, Cambridge, Waikato': 'Marychurch Rd, Waikato',
+                           'Waihi, Coromandel/Hauraki': 'Waihi, Hauraki',
+                           'Waihi, Coromandel': 'Waihi, Hauraki',
+                           'Eastern BOP': 'Bay of Plenty',
+                           'BOP': 'Bay of Plenty',
+                           'Kaweka Ranges, Hawkes Bay': 'Kaweka',
+                           'Waikawa Beach, Levin': 'Waikawa Beach, Horowhenua',
+                           'Waikawa Beach, Otaki': 'Waikawa Beach, Horowhenua',
+                           'King Country': '', # The King Country is not an actual district
+                           'Waimate, between Timaru and Oamaru': 'Waimate',
+                           'Alderman Islands, some 20km east of Tairua &amp; Pauanui, Coromandel': 'Ruamahuaiti Island',
+                           'Tapeka Point: Bay of Islands': 'Tapeka',
+                           'Raglan Beach': 'Raglan',
+                           'Waitemata Harbour': '',
+                           'North Shore City': 'North Shore',
+                           'Waitarere Beach, Levin': 'Waitarere Beach',
+                           'Snells Beach, Warkworth': 'Snells Beach',
+                           "Snell's Beach": 'Snells Beach',
+                           'Birds ferry Road, Westport': 'Birds Ferry Road',
+                           'Waiheke Island': 'Waiheke',
+                           'Forrest Hill, Sunnynook': 'Forrest Hill',
+                           'South Auckland': 'Auckland',
+                           'Otara, East Tamaki': 'Otara'
                            }
             for loc in locations:
                 for k in corrections.keys():
@@ -171,27 +221,86 @@ class UFOSighting(object):
 
         def strip_nonalpha_at_end(location):
             # Remove non-letter characters at the end of the string
+            valid = ['(',')']
             loc = location
             if not loc[-1].isalpha():
                 for i, c in enumerate(reversed(location)):
-                    if not c.isalpha():
+                    if not c.isalpha() and c not in valid:
                         loc = loc[:-1]
                     else:
                         return loc
             return loc
 
-        def attempt_geocode(location):
+        def strip_conjunctions_at_start(location, conjunctions=['of','to','and','from','between']):
+            for conjunction in conjunctions:
+                if location.strip().startswith(conjunction):
+                    yield location.strip()[len(conjunction):].strip()
+                else:
+                    yield location
+
+        def return_location_without_non_title_case_and_short_words(location, short=1, pattern='\W*\b\w{{short}}\b'):
+            location = ' '.join([s for s in location.split(' ') if s.istitle()])
+            pattern = re.compile(pattern.format(short=short))
+            m = pattern.findall(location)
+            for sub in m:
+                location = location.replace(m,'')
+            return location
+
+        def yield_locations_without_slash(location, pattern='(\w*/[\w\s]*)'):
+            '''
+            Generator function; best illustrated with the following:
+            >>> location = 'Takanini/Papakura, Auckland, New Zealand'
+            >>> for loc in get_locations_with_slash(location):
+            >>>    print loc
+            'Takanini, Auckland, New Zealand'
+            'Papakura, Auckland, New Zealand'
+            '''
+            if '/' not in location:
+                return
+                yield
+            pattern = re.compile(pattern)
+            for m in pattern.finditer(location):
+                m = m.group()
+                for sub in m.split('/'):
+                    yield location.replace(m,sub)
+
+        def yield_locations_without_ampersand(location, pattern='(\w*\s&amp;\s\w*)'):
+            # TODO DRY (see yield_locations_without_slash)
+            if '&amp;' not in location:
+                return
+                yield
+            pattern = re.compile(pattern)
+            for m in pattern.finditer(location):
+                m = m.group()
+                for sub in m.split('&amp;'):
+                    yield location.replace(m,sub)
+
+        def return_location_without_bracketed_clause(location, pattern='\s\([\w\s]+\)'):
+            '''
+            Returns location without a bracketed clause:
+            >>> location = 'Manukau (near Auckland airport), Auckland, New Zealand'
+            >>> return_location_without_bracketed_clause(location)
+            Manukau, Auckland, New Zealand
+            '''
+            if '(' not in location or ')' not in location:
+                return location
+            pattern = re.compile(pattern)
+            return pattern.sub('',location)
+
+        def attempt_geocode(location, debug=debug):
             location = location.strip()
+            # Remove repeat white space
+            location = ' '.join([segment for segment in location.split()])
             if location in self.already_attempted:
                 return None
             self.already_attempted.add(location)
-
             if location == '':
                 self.latitude, self.longitude = None, None
                 return False # Failure
-
+            # Strip non-alpha characters at end of location
             location = strip_nonalpha_at_end(location)
-            print repr(location),
+            if debug:
+                print repr(location),
             try:
                 geocoded = geolocator.geocode(location,exactly_one=exactly_one)
             except GeocoderTimedOut:
@@ -202,68 +311,111 @@ class UFOSighting(object):
                 self.latitude = geocoded.latitude
                 self.longitude = geocoded.longitude
                 self.geocoded_to = location
-                print self.latitude, self.longitude,
-                print bcolors.OKBLUE + '← success' + bcolors.ENDC
+                if debug:
+                    print self.latitude, self.longitude,
+                    print bcolors.OKBLUE + '← success\n' + bcolors.ENDC
                 return True # Success
 
-            print bcolors.FAIL + '← fail' + bcolors.ENDC
+            if debug:
+                print bcolors.FAIL + '← fail' + bcolors.ENDC
             return None # No result, but there are more options to try
 
         # Main loop
+
         if self.location is None:
             return False
+
         geolocator = Nominatim(country_bias=bias,timeout=timeout)
+
         location = self.location
+
+        # TODO:
+        # '12:00 am, New Zealand' -37.7894134 175.2850399
+        if location == '12:00 am':
+            return None
+
+        if debug:
+            print repr(self.location) + ' ← original'
+
+        # Remove HTML entities
+        location = location.encode("utf8")
+        for char in ['&rsquo;','\r','\n']:
+            location = location.replace(char,'')
+
+        # Remove repeat white space
+        location = ' '.join([segment for segment in location.split()])
+
+        location = strip_nonalpha_at_end(location)
+
+        # North Island and South Island are not useful to the geocoder
+        for island in ['North Island', 'South Island', 'NI', 'SI', 'Nth Island', 'Sth Island', 'North Is', 'South Is']:
+            if not strip_nonalpha_at_end(location).endswith(island) and not strip_nonalpha_at_end(location).endswith(island + ', New Zealand'):
+                continue
+            location = location.replace(island,'')
+
+        # It helps to add "New Zealand" even though a country bias is used
+        # NOTE that there are (for some reason) some non-NZ observations
+        non_nz_places = ['Antarctica', 'Timor Sea', 'South Pacific Ocean']
+        append_nz = True
+        for place in non_nz_places:
+            if place in location:
+                append_nz = False
+
+        if append_nz:
+            location.replace(' NZ',' New Zealand')
+            if not location.strip().endswith(','):
+                location = location.strip() + ','
+            if 'New Zealand' not in location:
+                location = location.strip() + ' New Zealand'
+
         self.already_attempted = set([])
+
         while True:
 
-            attempts = set([strip_nonalpha_at_end(location)])
-
-            # Very often helps to add "New Zealand" even though a country bias
-            # is already being used
-            if 'Antarctica' not in location and 'New Zealand' not in location:
-                loc = strip_nonalpha_at_end(location)
-                loc += ', New Zealand'
-                attempts.add(loc)
-
-            # Simply try the location description, with and without NZ at end
-            for loc in attempts:
-                gc = attempt_geocode(location)
+            # Try the location description, without leading conjunctions
+            for loc in strip_conjunctions_at_start(location):
+                gc = attempt_geocode(loc)
                 if gc is not None:
                     return gc
 
-            # Try without "North Island" or "South Island"
-            attempts_copy = attempts.copy()
+            # If there's a slash in the name, split it into two attempts
+            attempts_copy = self.already_attempted.copy()
             for loc in attempts_copy:
-                if 'North Island' in loc.title() or 'South Island' in loc.title():
-                    for rep in ['North Island','South Island']:
-                        loc = loc.replace(rep+', ','')
-                        loc = loc.replace(rep,'')
-                    loc = strip_nonalpha_at_end(loc)
-                    attempts.add(loc)
+                for loc in yield_locations_without_slash(loc):
                     gc = attempt_geocode(loc)
                     if gc is not None:
                         return gc
 
+            # If there's an ampersand in the name, split it into two attempts
+            attempts_copy = self.already_attempted.copy()
+            for loc in attempts_copy:
+                for loc in yield_locations_without_ampersand(loc):
+                    gc = attempt_geocode(loc)
+                    if gc is not None:
+                        return gc
+
+
+            # Try without a bracketed clause
+            attempts_copy = self.already_attempted.copy()
+            for loc in attempts_copy:
+                gc = attempt_geocode(return_location_without_bracketed_clause(loc))
+                if gc is not None:
+                    return gc
+
             # Try with some common substitutions or known errors:
-            attempts_copy = attempts.copy()
+            attempts_copy = self.already_attempted.copy()
             for loc in substitutions_for_known_issues(attempts_copy):
-                loc = strip_nonalpha_at_end(loc)
-                attempts.add(loc)
                 gc = attempt_geocode(loc)
                 if gc is not None:
                     return gc
 
             # Try again without non-title-case words, and without one-letter words
-            attempts_copy = attempts.copy()
-            non_title_case = ' '.join([s for s in location.split(' ') if s.istitle()])
-            shortwords = re.compile(r'\W*\b\w{1}\b')
-            non_title_case = shortwords.sub('', non_title_case)
-            non_title_case = strip_nonalpha_at_end(non_title_case)
-            attempts.add(non_title_case)
-            gc = attempt_geocode(non_title_case)
-            if gc is not None:
-                return gc
+            attempts_copy = self.already_attempted.copy()
+            for loc in attempts_copy:
+                loc = return_location_without_non_title_case_and_short_words(loc)
+                gc = attempt_geocode(loc)
+                if gc is not None:
+                    return gc
 
             self.geocode_attempts += 1
 
@@ -272,7 +424,7 @@ class UFOSighting(object):
 
             # While loop repeats
 
-def get_all_sightings_as_list_of_UFOSighting_objects(link, geocode=True):
+def get_all_sightings_as_list_of_UFOSighting_objects(link, geocode=True, debug=True):
     '''
     Returns a list of UFOSighting objects, scraped from one link to a page of
     sighting reports.
@@ -304,8 +456,8 @@ def get_all_sightings_as_list_of_UFOSighting_objects(link, geocode=True):
             continue
 
         if geocode:
-            if not ufo.geocode():
-                # Ignore UFO sightings that cannot be goecoded
+            if not ufo.geocode(debug=debug):
+                # Ignore UFO sightings that cannot be geocoded
                 continue
 
         sightings.append(ufo)
@@ -325,7 +477,7 @@ def export_ufos_to_csv(list_of_UFOSighting_objects):
 
     return None
 
-def main():
+def main(debug=False):
 
     def valid(tag):
         '''
@@ -343,9 +495,7 @@ def main():
     # Get list of valid links from home page
     # There is one for each year
     years = sorted(set(filter(lambda x: valid(x), [li for li in home_page.findAll(href=True)])))
-    # print years
-    # print years[0]
-    # print type(years[0])
+
     # There are some other links scattered around the website that have reports in the same format
     additional_links = ['http://www.ufocusnz.org.nz/content/Police/101.aspx',
                         'http://www.ufocusnz.org.nz/content/Selection-of-Historic-Sighting-Reports/109.aspx',
@@ -357,14 +507,13 @@ def main():
     # TODO see here for more, although they conform less to the expected structure
     # http://www.ufocusnz.org.nz/content/Aviation/80.aspx
 
-    #years += additional_links
-    years = [years[-1]] + additional_links
+    years += additional_links
 
     # Flatten lists of UFOs for each year
-    all_sightings = reduce(lambda x,y: x+y, [get_all_sightings_as_list_of_UFOSighting_objects(year['href'],geocode=True) for year in years])
+    all_sightings = reduce(lambda x,y: x+y, [get_all_sightings_as_list_of_UFOSighting_objects(year['href'],geocode=True,debug=debug) for year in years])
 
     export_ufos_to_csv(all_sightings)
 
 if __name__ == '__main__':
-    main()
+    main(debug=True)
     exit(0)
