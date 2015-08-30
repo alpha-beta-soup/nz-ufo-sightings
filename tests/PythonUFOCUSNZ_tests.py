@@ -20,7 +20,7 @@ def test_sanity_check_first_2010_sighting():
 
     first_sighting = sightings_in_2010[0]
 
-    assert first_sighting.isValid()
+    assert first_sighting.is_valid()
     assert first_sighting.geocode()
     assert first_sighting.date == datetime.datetime(2010,12,31)
     assert first_sighting.location.title() == "Tauranga, North Island"
