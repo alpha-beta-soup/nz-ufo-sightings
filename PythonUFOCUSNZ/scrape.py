@@ -365,7 +365,7 @@ class UFOSighting(object):
         return False
 
     def attempt_geocode(self, location,
-        bias='New Zealand', timeout=6, exactly_one=True, debug=False
+        bias='New Zealand', timeout=6, exactly_one=True, debug=True
         ):
         '''
         Attempts a geocode, returning None, False, or True acccording
@@ -611,7 +611,7 @@ def main(debug=False):
 
     # Get list of valid links from home page
     # There is one for each year
-    years = sorted(
+    links = sorted(
         set([li for li in home_page.findAll(href=True) if valid(li)])
     )
 
@@ -630,14 +630,15 @@ def main(debug=False):
     # TODO see here for more, although they conform less to the expected structure
     # http://www.ufocusnz.org.nz/content/Aviation/80.aspx
 
-    years += additional_links
+    links += additional_links
+    links = set([l['href'] for l in links])
 
-    # Flatten lists of UFOs for each year
+    # Flatten lists of UFOs for each link
     all_sightings = reduce(
         lambda x, y: x+y, [
             get_all_sightings_as_list_of_UFOSighting_objects(
-                year['href'], geocode=True, debug=debug
-            ) for year in years
+                link, geocode=True, debug=debug
+            ) for link in links
         ]
     )
 
