@@ -17,12 +17,15 @@ from urllib import urlopen
 import re
 import string
 import os
+import HTMLParser
 
 # pylint: disable=import-error
 from BeautifulSoup import BeautifulSoup
 import pandas as pd
 from geopy.geocoders import Nominatim
 from geopy.exc import GeocoderTimedOut
+import json
+from geojson import Point, Feature, FeatureCollection
 
 def handle_special_date_exception(date_string, exc):
     '''
@@ -355,6 +358,14 @@ class UFOSighting(object):
             self.features, self.description
         )
 
+    def __geojson__(self, exclude=['longitude','latitude','already_attempted']):
+        h = HTMLParser.HTMLParser()
+        return Feature(
+            geometry=Point((self.longitude, self.latitude)),
+            properties={key: h.unescape(str(value)) for key, value in self.__dict__.items() \
+            if key not in exclude}
+        )
+
     def is_valid(self):
         '''
         Retutns boolean indicating whether or not an HTML actually has content
@@ -594,6 +605,17 @@ def export_ufos_to_csv(list_of_UFOSighting_objects):
 
     return None
 
+def export_ufos_to_geojson(list_of_UFOSighting_objects):
+    '''
+    Given a list of all the UFO sightings found on the website as UFOSighting
+    objects, exports them to GeoJSON.
+    '''
+    fc = FeatureCollection(
+        [ufo.__geojson__() for ufo in list_of_UFOSighting_objects]
+    )
+    with open(os.path.join(os.path.dirname(__file__),'ufos_data.geojson'),'w') as outfile:
+        json.dump(fc, outfile)
+
 def main(debug=False):
     '''Main loop'''
     def valid(tag):
@@ -642,7 +664,8 @@ def main(debug=False):
         ]
     )
 
-    export_ufos_to_csv(all_sightings)
+    # export_ufos_to_csv(all_sightings)
+    export_ufos_to_geojson(all_sightings)
 
 if __name__ == '__main__':
     main(debug=True)
