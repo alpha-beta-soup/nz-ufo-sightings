@@ -11,7 +11,7 @@ config = {
     'download_url': 'https://github.com/alpha-beta-soup/nz-ufo-sightings/archive/master.zip',
     'author_email': 'richard.m.law@gmail.com',
     'version': '0.1',
-    'install_requires': ['nose','BeautifulSoup','pandas','geopy'],
+    'install_requires': ['nose','BeautifulSoup','pandas','geopy','geojson'],
     'packages': ['PythonUFOCUSNZ'],
     'scripts': [],
     'name': 'PythonUFOCUSNZ'
