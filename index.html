@@ -1,74 +1,49 @@
 <!DOCTYPE html>
 <html>
-	<head>
-		<title>NZ UFO Sightnings</title>
-		<meta charset="utf-8" />
-		<link rel="stylesheet" href="http://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.3/leaflet.css" />
-		<link rel="stylesheet" href="css/MarkerCluster.css" />
-		<link rel="stylesheet" href="css/MarkerCluster.Default.css" />
-		<link rel="stylesheet" type="text/css" href="css/own_style.css">
-		<script src="http://code.jquery.com/jquery-1.11.1.min.js"></script>
-		<script src="http://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.3/leaflet.js"></script>
-		<script src="js/leaflet-hash.js"></script>
-		<script src="js/Autolinker.min.js"></script>
-		<script src="js/leaflet.markercluster.js"></script>
-		<meta name="viewport" content="initial-scale=1.0, user-scalable=no" />
-	</head>
-	<body>
-		<div id="map"></div>
-		<script src="data/exp_test.js"></script>
-		<script>
-		var map = L.map('map', {
-			zoomControl:true, maxZoom:19
-		}).fitBounds([[-47.5671144817,169.162666546],[-34.8505171946,179.273403733]]);
-		var hash = new L.Hash(map);
-		var additional_attrib = 'created w. <a href="https://github.com/geolicious/qgis2leaf" target ="_blank">qgis2leaf</a> by <a href="http://www.geolicious.de" target ="_blank">Geolicious</a> & contributors<br>';
-		var feature_group = new L.featureGroup([]);
-		var raster_group = new L.LayerGroup([]);
-		var basemap_0 = L.tileLayer('http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { 
-			attribution: additional_attrib + '&copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors,<a href="http://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>'
-		});	
-		basemap_0.addTo(map);	
-		var layerOrder=new Array();
-		function pop_test(feature, layer) {					
-			var popupContent = '<table><tr><th scope="row">Date</th><td>' + Autolinker.link(String(feature.properties['Date'])) + '</td></tr><tr><th scope="row">Time</th><td>' + Autolinker.link(String(feature.properties['Time'])) + '</td></tr><tr><th scope="row">Location</th><td>' + Autolinker.link(String(feature.properties['Location'])) + '</td></tr><tr><th scope="row">Latitude</th><td>' + Autolinker.link(String(feature.properties['Latitude'])) + '</td></tr><tr><th scope="row">Longitude</th><td>' + Autolinker.link(String(feature.properties['Longitude'])) + '</td></tr><tr><th scope="row">Features</th><td>' + Autolinker.link(String(feature.properties['Features'])) + '</td></tr><tr><th scope="row">Descriptio</th><td>' + Autolinker.link(String(feature.properties['Descriptio'])) + '</td></tr><tr><th scope="row">GeocodedAs</th><td>' + Autolinker.link(String(feature.properties['GeocodedAs'])) + '</td></tr><tr><th scope="row">GeocodeI</th><td>' + Autolinker.link(String(feature.properties['GeocodeI'])) + '</td></tr></table>';
-			layer.bindPopup(popupContent);
-		}
+<head>
+<meta charset=utf-8 />
+<title>A simple map</title>
+<meta name='viewport' content='initial-scale=1,maximum-scale=1,user-scalable=no' />
+<script src='https://api.mapbox.com/mapbox.js/v2.2.2/mapbox.js'></script>
+<link href='https://api.mapbox.com/mapbox.js/v2.2.2/mapbox.css' rel='stylesheet' />
+<script src="http://code.jquery.com/jquery-2.1.0.min.js"></script>
+<style>
+  body { margin:0; padding:0; }
+  #map { position:absolute; top:0; bottom:0; width:100%; }
+  .leaflet-popup-content { height: 200px; overflow : auto; }
+</style>
+<link rel="ufos" type="application/json" href="./data/ufos_data.geojson">
+</head>
+<body>
 
-		var exp_testJSON = new L.geoJson(exp_test,{
-			onEachFeature: pop_test,
-			pointToLayer: function (feature, latlng) {  
-				return L.circleMarker(latlng, {
-					radius: 4.0,
-					fillColor: '#ff0000',
-					color: '#000000',
-					weight: 1,
-					opacity: 1.0,
-					fillOpacity: 1.0
-				})
-			}
-		});
-		var cluster_grouptestJSON= new L.MarkerClusterGroup({showCoverageOnHover: false});
-		cluster_grouptestJSON.addLayer(exp_testJSON);
-		//add comment sign to hide this layer on the map in the initial view.
-		cluster_grouptestJSON.addTo(map);
+<script src='https://api.mapbox.com/mapbox.js/plugins/leaflet-markercluster/v0.4.0/leaflet.markercluster.js'></script>
+<link href='https://api.mapbox.com/mapbox.js/plugins/leaflet-markercluster/v0.4.0/MarkerCluster.css' rel='stylesheet' />
+<link href='https://api.mapbox.com/mapbox.js/plugins/leaflet-markercluster/v0.4.0/MarkerCluster.Default.css' rel='stylesheet' />
 
-		feature_group.addTo(map);
-		var title = new L.Control();
-		title.onAdd = function (map) {
-			this._div = L.DomUtil.create('div', 'info'); // create a div with a class "info"
-			this.update();
-			return this._div;
-		};
-		title.update = function () {
-			this._div.innerHTML = '<h2>NZ UFO sightnings</h2>© UFOCUS NZ'
-		};
-		title.addTo(map);
-	var baseMaps = {
-		'OSM Standard': basemap_0
-	};
-		L.control.layers(baseMaps,{"test": cluster_grouptestJSON},{collapsed:false}).addTo(map);
-		L.control.scale({options: {position: 'bottomleft',maxWidth: 100,metric: true,imperial: false,updateWhenIdle: false}}).addTo(map);
-	</script>
+<div id='map'></div>
+<script>
+L.mapbox.accessToken = 'pk.eyJ1IjoiYWxwaGEtYmV0YS1zb3VwIiwiYSI6ImxMaVFfVTAifQ.VD93-nQ8FuT4VsPyh8LbBw';
+// var map = L.mapbox.map('map', 'mapbox.streets')
+//     .setView([40, -74.50], 9);
+var map = L.mapbox.map('map', 'alpha-beta-soup.cda5ee4e').setView([-41.2889, 174.7772], 6);
+
+var ufo_icon = L.icon({
+    iconUrl: './style/icon__ufo.svg',
+    iconSize: [35, 35] // size of the icon
+});
+
+$.getJSON($('link[rel="ufos"]').attr("href"), function(data) {
+    var ufos = L.geoJson(data, {
+      onEachFeature: function (feature, layer) {
+        layer.bindPopup(feature.properties.description);
+      },
+      pointToLayer: function (feature, latlng) {
+        return L.marker(latlng, {icon: ufo_icon});
+      }
+    });
+  ufos.addTo(map);
+});
+</script>
+
 </body>
 </html>

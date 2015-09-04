@@ -1,0 +1,34 @@
+_prefs: 
+  disabled: []
+  inspector: false
+  mapid: alpha-beta-soup.08580993
+  rev: s-cde61818
+  saveCenter: true
+attribution: "http://www.ufocusnz.org.nz/"
+center: 
+  - 171.8921
+  - -41.0214
+  - 7
+description: New Zealand UFO sightnings, scraped from UFOcus NZ's website, and geocoded with Nominatim
+Layer: 
+  - id: ufos_data
+    Datasource: 
+      file: /home/richard/Documents/Projects/nz-ufo-sightings/data/ufos_data.geojson
+      layer: OGRGeoJSON
+      type: ogr
+    description: NZ UFO Sightnings
+    fields: 
+      date: Date
+      description: Description of the sightning, from UFOcus NZ
+      features: Features
+      geocode_attempts: Geocoding accuracy heuristic
+      geocoded_to: The text that resultted in a successful geocode with Nominatim
+      location: Original location description, used as a base for geocoding
+      source: URL of original report
+      time: Time
+    properties: 
+      "buffer-size": 40
+    srs: +proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs
+maxzoom: 16
+minzoom: 0
+name: NZ UFO Sightings
