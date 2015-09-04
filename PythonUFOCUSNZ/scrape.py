@@ -53,7 +53,7 @@ def handle_special_date_exception(date_string, exc):
     'early May 2015': '3 May 2015',
     'Late August or early September, 1971': '31 august 1971',
     'Last quarter of 1999': '15 November 1999',
-    'Exact date unknown; between 1957 and 1968': None}
+    'Exact date unknown; between 1957 and 1968': '1 January 1957'}
     if date_string.strip() in exceptions.keys():
         return exceptions[date_string.strip()]
     else:
@@ -100,8 +100,6 @@ def return_next_html_elem(soup, sighting_property, to_find='td', pattern='{}:'):
 
     if results is None:
 
-        #print soup, sighting_property
-
         # Try a variety of corner cases
         # TODO Make this cleaner
 
@@ -139,7 +137,7 @@ def return_next_html_elem(soup, sighting_property, to_find='td', pattern='{}:'):
             ]
             if pattern.format(sighting_property) not in text:
                 return None # Simply doesn't exist
-            return ''.join(text[text.index('Description')+1:])
+            return '<br>'.join(text[text.index('Description')+1:])
 
         # If all else fails
         # TODO log so can be corrected if possible
@@ -563,6 +561,13 @@ def get_all_sightings_as_list_of_UFOSighting_objects(
             table, 'Features/characteristics'
         )
         description = return_next_html_elem(table, 'Description')
+        description_with_breaks = ''
+        split_description = [d for d in description.split('.') if d.strip()]
+        for i, d in enumerate(split_description[:-1]):
+            if split_description[i+1][0].isalpha():
+                d += '.<br><br>'
+            description_with_breaks += d
+        description = description_with_breaks + split_description[-1] + '.'
 
         ufo = UFOSighting(source, date, time, location, features, description)
 
@@ -608,8 +613,15 @@ def export_ufos_to_csv(list_of_UFOSighting_objects):
 def export_ufos_to_geojson(list_of_UFOSighting_objects):
     '''
     Given a list of all the UFO sightings found on the website as UFOSighting
-    objects, exports them to GeoJSON.
+    objects, exports them to GeoJSON. The list is sorted by date, because the
+    leaflet timeslider doesn't sort on a key, and I can't work out how to do it
+    in JavaScript because it is a horrible mistake of a language. Therefore
+    it also removes observations that don't have a date.
     '''
+    list_of_UFOSighting_objects = [l for l in list_of_UFOSighting_objects if l is not None]
+    list_of_UFOSighting_objects.sort(
+        key=lambda x: x.date, reverse=False
+    )
     fc = FeatureCollection(
         [ufo.__geojson__() for ufo in list_of_UFOSighting_objects]
     )
