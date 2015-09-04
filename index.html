@@ -27,6 +27,9 @@
   .glyphicon {
     margin-right:5px;
   }
+  .url {
+    font-size:90%;
+  }
 </style>
 <link rel="ufos" type="application/json" href="./data/ufos_data.geojson">
 </head>
@@ -73,7 +76,10 @@ $.getJSON($('link[rel="ufos"]').attr("href"), function(data) {
           '<span class="glyphicon glyphicon-time"></span>  ' +
           feature.properties.time + '<br>' +
           '<span class="glyphicon glyphicon-map-marker"></span> ' +
-          feature.properties.location + '</em><br><br>' +
+          feature.properties.location + '<br>' +
+          '<span class="glyphicon glyphicon-link"></span> ' +
+          '<a href="' + feature.properties.source + '"><span class="url">' +
+          feature.properties.source + '</span></a></em><br><br>' +
           feature.properties.description + '<br>'
         );
       },
