@@ -561,13 +561,17 @@ def get_all_sightings_as_list_of_UFOSighting_objects(
             table, 'Features/characteristics'
         )
         description = return_next_html_elem(table, 'Description')
-        description_with_breaks = ''
-        split_description = [d for d in description.split('.') if d.strip()]
-        for i, d in enumerate(split_description[:-1]):
-            if split_description[i+1][0].isalpha():
-                d += '.<br><br>'
-            description_with_breaks += d
-        description = description_with_breaks + split_description[-1] + '.'
+
+        # Work-around to re-build paragraph breaks, which get lost because
+        # they are <br> tags.
+        if description is not None and description.strip():
+            description_with_breaks = ''
+            split_description = [d for d in description.split('.') if d is not None and d.strip()]
+            for i, d in enumerate(split_description[:-1]):
+                if split_description[i+1][0].isalpha():
+                    d += '.<br><br>'
+                description_with_breaks += d
+                description = description_with_breaks + split_description[-1] + '.'
 
         ufo = UFOSighting(source, date, time, location, features, description)
 
