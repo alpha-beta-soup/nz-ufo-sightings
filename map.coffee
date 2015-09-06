@@ -2,8 +2,8 @@ L.mapbox.accessToken = "pk.eyJ1IjoiYWxwaGEtYmV0YS1zb3VwIiwiYSI6ImxMaVFfVTAifQ.VD
 map = L.mapbox.map('map',"alpha-beta-soup.cda5ee4e")
 map.setView [-41.2889, 174.7772], 6
 ufo_icon = L.icon(
-  iconUrl: './style/icon__ufo.svg'
-  iconSize: [35, 35]
+  iconUrl: './style/ufo_icon.svg'
+  iconSize: [25, 25]
 )
 oms = new OverlappingMarkerSpiderfier(map)
 popup = new L.Popup()
