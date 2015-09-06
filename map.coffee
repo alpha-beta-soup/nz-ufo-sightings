@@ -56,15 +56,15 @@ $.getJSON $('link[rel="ufos"]').attr('href'), (data) ->
   sliderControl.startSlider()
   return
 
-credits = L.control.attribution().addTo(map)
-attribution ->
+get_attribution = ->
   ufocus_web = 'http://www.ufocusnz.org.nz/'
   ufocus = 'UFOCUS NZ'
   github = 'https://github.com/alpha-beta-soup/nz-ufo-sightings'
   twitter = 'https://twitter.com/alphabeta_soup'
   attribution = "UFO data © <a href=''#{ufocus_web}'>#{ufocus}</a>"
   attribution += " | <a href='#{github}')>Github</a>"
-  attribution += " | <a href='#{{twitter}}'>Twitter</a>"
+  attribution += " | <a href='#{twitter}'>Twitter</a>"
   return attribution
 
-credits.addAttribution attribution
+credits = L.control.attribution().addTo(map)
+credits.addAttribution get_attribution()
