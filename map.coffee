@@ -5,7 +5,24 @@ ufo_icon = L.icon(
   iconUrl: './style/ufo_icon.svg'
   iconSize: [25, 25]
 )
-oms = new OverlappingMarkerSpiderfier(map)
+ufo_icon_cow = L.icon(
+  iconUrl: './style/ufo_icon_with_cow.svg'
+  iconSize: [35, 35]
+)
+oms = new OverlappingMarkerSpiderfier(
+  map,
+  keepSpiderfied: true,
+  circleSpiralSwitchover: Infinity,
+  legWeight: 2.5
+)
+get_icon = ->
+  icon = ufo_icon
+  # Little easter egg
+  if Math.random() > 0.98
+    icon = ufo_icon_cow
+  return icon
+oms.legColors.usual = 'red'
+oms.legColors.highlighted = 'white'
 popup = new L.Popup()
 
 oms.addListener 'click', (marker) ->
@@ -14,13 +31,15 @@ oms.addListener 'click', (marker) ->
   map.openPopup popup
   return
 
+oms.addListener 'spiderfy', (markers) ->
+  map.closePopup()
+  return
+
 $.getJSON $('link[rel="ufos"]').attr('href'), (data) ->
   ufos = L.geoJson(data,
     onEachFeature: (feature, layer, latlng) ->
       dateObject = new Date(
-        Date.parse(
-          feature.properties.date.substring(0, 10)
-        )
+        Date.parse(feature.properties.date.substring(0, 10))
       )
       layer.bindPopup(
         '<em><span class="glyphicon glyphicon-question-sign"></span> ' +
@@ -41,9 +60,9 @@ $.getJSON $('link[rel="ufos"]').attr('href'), (data) ->
     pointToLayer: (feature, latlng) ->
       marker = L.marker(
         latlng,
-        icon: ufo_icon
+        icon: get_icon()
       )
-      oms.addMarker marker # Add to spider
+      oms.addMarker marker
       return marker
   )
   sliderControl = L.control.sliderControl(
