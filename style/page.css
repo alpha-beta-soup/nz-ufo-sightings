@@ -1,0 +1,15 @@
+body { margin:0; padding:0; }
+#map { position:absolute; top:0; bottom:0; width:100%; }
+.leaflet-popup-content {
+  height:200px;
+  overflow:auto;
+  font-family:Verdana, Geneva, sans-serif;
+  line-height:150%;
+  padding:15px;
+}
+.glyphicon {
+  margin-right:5px;
+}
+.url {
+  font-size:90%;
+}

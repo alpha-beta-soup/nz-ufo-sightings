@@ -4,105 +4,32 @@
 <meta charset=utf-8 />
 <title>NZ UFO Sightnings</title>
 <meta name='viewport' content='initial-scale=1,maximum-scale=1,user-scalable=no' />
+<!-- Mapbox -->
 <script src='https://api.mapbox.com/mapbox.js/v2.2.2/mapbox.js'></script>
 <link href='https://api.mapbox.com/mapbox.js/v2.2.2/mapbox.css' rel='stylesheet' />
+<!-- jQuery -->
 <script src="http://code.jquery.com/jquery-2.1.0.min.js"></script>
 <link type='text/css' href='http://code.jquery.com/ui/1.9.2/themes/base/jquery-ui.css' rel='stylesheet' />
 <script src='http://code.jquery.com/ui/1.9.2/jquery-ui.js'></script>
+<!-- Slider control -->
 <script src='./js/SliderControl.js'></script>
+<!-- Spider/cluster -->
 <script src='./js/oms.min.js'></script>
 <script src="//cdnjs.cloudflare.com/ajax/libs/jqueryui-touch-punch/0.2.2/jquery.ui.touch-punch.min.js"></script>
-<link rel="stylesheet" href="http://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css">
-<script src="http://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/js/bootstrap.min.js"></script>
-<style>
-  body { margin:0; padding:0; }
-  #map { position:absolute; top:0; bottom:0; width:100%; }
-  .leaflet-popup-content {
-    height:200px;
-    overflow:auto;
-    font-family:Verdana, Geneva, sans-serif;
-    line-height:150%;
-    padding:15px;
-  }
-  .glyphicon {
-    margin-right:5px;
-  }
-  .url {
-    font-size:90%;
-  }
-</style>
-<link rel="ufos" type="application/json" href="./data/ufos_data.geojson">
-</head>
-<body>
-
 <script src='https://api.mapbox.com/mapbox.js/plugins/leaflet-markercluster/v0.4.0/leaflet.markercluster.js'></script>
 <link href='https://api.mapbox.com/mapbox.js/plugins/leaflet-markercluster/v0.4.0/MarkerCluster.css' rel='stylesheet' />
 <link href='https://api.mapbox.com/mapbox.js/plugins/leaflet-markercluster/v0.4.0/MarkerCluster.Default.css' rel='stylesheet' />
-
+<!-- Bootstrap -->
+<link rel="stylesheet" href="http://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css">
+<script src="http://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/js/bootstrap.min.js"></script>
+<!-- ...and now to stand on the shoulders of giants -->
+<link href='./style/page.css' rel='stylesheet' />
+<link rel="ufos" type="application/json" href="./data/ufos_data.geojson">
+</head>
+<body>
 <div id='map'></div>
-<script>
-L.mapbox.accessToken = 'pk.eyJ1IjoiYWxwaGEtYmV0YS1zb3VwIiwiYSI6ImxMaVFfVTAifQ.VD93-nQ8FuT4VsPyh8LbBw';
-// var map = L.mapbox.map('map', 'mapbox.streets')
-//     .setView([40, -74.50], 9);
-var map = L.mapbox.map('map', 'alpha-beta-soup.cda5ee4e').setView([-41.2889, 174.7772], 6);
-
-var ufo_icon = L.icon({
-    iconUrl: './style/icon__ufo.svg',
-    iconSize: [35, 35] // size of the icon
-});
-
-var oms = new OverlappingMarkerSpiderfier(map);
-var popup = new L.Popup();
-oms.addListener('click', function(marker) {
-  popup.setContent(marker.desc);
-  popup.setLatLng(marker.getLatLng());
-  map.openPopup(popup);
-});
-
-$.getJSON($('link[rel="ufos"]').attr("href"), function(data) {
-    var ufos = L.geoJson(data, {
-      onEachFeature: function (feature, layer, latlng) {
-        var dateObject = new Date(
-          Date.parse(
-            feature.properties.date.substring(0,10)
-          )
-        );
-        layer.bindPopup(
-          '<em><span class="glyphicon glyphicon-question-sign"></span> ' +
-          feature.properties.features.substring(0,1).toUpperCase() +
-          feature.properties.features.substring(1) + '<br>' +
-          '<span class="glyphicon glyphicon-calendar"></span> ' +
-          dateObject.toDateString() + '<br>' +
-          '<span class="glyphicon glyphicon-time"></span>  ' +
-          feature.properties.time + '<br>' +
-          '<span class="glyphicon glyphicon-map-marker"></span> ' +
-          feature.properties.location + '<br>' +
-          '<span class="glyphicon glyphicon-link"></span> ' +
-          '<a href="' + feature.properties.source + '"><span class="url">' +
-          feature.properties.source + '</span></a></em><br><br>' +
-          feature.properties.description + '<br>'
-        );
-      },
-      pointToLayer: function (feature, latlng) {
-        var marker = L.marker(latlng, {icon: ufo_icon})
-        oms.addMarker(marker);
-        return marker;
-      }
-    });
-    var sliderControl = L.control.sliderControl({
-      position: "topright",
-      layer: ufos,
-      range: true
-    });
-  ufos.addTo(map);
-  map.addControl(sliderControl);
-  sliderControl.startSlider();
-});
-
-var credits = L.control.attribution().addTo(map);
-credits.addAttribution("UFO data © <a href='http://www.ufocusnz.org.nz/'>UFOCUS NZ</a> | <a href='https://github.com/alpha-beta-soup/nz-ufo-sightings')>Github</a> | <a href='https://twitter.com/alphabeta_soup'>Twitter</a>");
-
-</script>
-
+<!-- Brew some coffee -->
+<script src='//cdnjs.cloudflare.com/ajax/libs/coffee-script/1.7.1/coffee-script.min.js'></script>
+<script src='map.coffee', type='text/coffeescript'></script>
 </body>
 </html>
