@@ -7,7 +7,7 @@ ufo_icon = L.icon(
 )
 ufo_icon_cow = L.icon(
   iconUrl: './style/ufo_icon_with_cow.svg'
-  iconSize: [35, 35]
+  iconSize: [25, 25]
 )
 oms = new OverlappingMarkerSpiderfier(
   map,
@@ -80,7 +80,7 @@ get_attribution = ->
   ufocus = 'UFOCUS NZ'
   github = 'https://github.com/alpha-beta-soup/nz-ufo-sightings'
   twitter = 'https://twitter.com/alphabeta_soup'
-  attribution = "UFO data © <a href=''#{ufocus_web}'>#{ufocus}</a>"
+  attribution = "UFO data © <a href='#{ufocus_web}'>#{ufocus}</a>"
   attribution += " | <a href='#{github}')>Github</a>"
   attribution += " | <a href='#{twitter}'>Twitter</a>"
   return attribution
