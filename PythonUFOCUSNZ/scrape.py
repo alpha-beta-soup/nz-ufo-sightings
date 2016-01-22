@@ -22,10 +22,17 @@ import HTMLParser
 # pylint: disable=import-error
 from BeautifulSoup import BeautifulSoup
 import pandas as pd
-from geopy.geocoders import Nominatim
+from geopy.geocoders import (
+    Nominatim
+    # OpenMapQuest
+)
 from geopy.exc import GeocoderTimedOut
 import json
-from geojson import Point, Feature, FeatureCollection
+from geojson import (
+    Point,
+    Feature,
+    FeatureCollection
+)
 
 def handle_special_date_exception(date_string, exc):
     '''
@@ -79,11 +86,10 @@ def parse_date(date_string):
             date_string = parse_date(date_string)
     return date_string
 
-# TODO expand docstring
 # pylint: disable=too-many-return-statements
 def return_next_html_elem(soup, sighting_property, to_find='td', pattern='{}:'):
     '''
-    Returns the subsequent HTML `to_find` element.
+    Returns the subsequent HTML `to_find` element after <sighting_property>
     '''
     assert sighting_property in [
         'Date',
@@ -101,7 +107,6 @@ def return_next_html_elem(soup, sighting_property, to_find='td', pattern='{}:'):
     if results is None:
 
         # Try a variety of corner cases
-        # TODO Make this cleaner
 
         # Sometimes it's "special"
         if sighting_property == 'Features/characteristics':
@@ -140,14 +145,12 @@ def return_next_html_elem(soup, sighting_property, to_find='td', pattern='{}:'):
             return '<br>'.join(text[text.index('Description')+1:])
 
         # If all else fails
-        # TODO log so can be corrected if possible
         return None
 
     # Once the identifier is found, grab the next table row, which is the *data*
     try:
         result = results.findNext('td').text
     except Exception, exc:
-        # TODO log
         raise exc
 
     # Remove &nbsp;
@@ -356,12 +359,17 @@ class UFOSighting(object):
             self.features, self.description
         )
 
-    def __geojson__(self, exclude=['longitude','latitude','already_attempted']):
+    def __geojson__(
+        self, exclude=['longitude', 'latitude', 'already_attempted']):
         h = HTMLParser.HTMLParser()
+        if not (self.longitude and self.latitude):
+            return None
         return Feature(
             geometry=Point((self.longitude, self.latitude)),
-            properties={key: h.unescape(str(value)) for key, value in self.__dict__.items() \
-            if key not in exclude}
+            properties={
+                key: h.unescape(str(value)) for key, value in \
+                self.__dict__.items() if key not in exclude
+            }
         )
 
     def is_valid(self):
@@ -383,6 +391,7 @@ class UFOSighting(object):
         self.longitude, and self.geocoded_to
         '''
         geolocator = Nominatim(country_bias=bias, timeout=timeout)
+        # geolocator = OpenMapQuest(timeout=timeout)
         location = location.strip()
         # Remove repeat white space
         location = ' '.join([segment for segment in location.split()])
@@ -408,7 +417,7 @@ class UFOSighting(object):
             self.geocoded_to = location
             if debug:
                 print self.latitude, self.longitude,
-                print Bcolors.OKBLUE + '← success\n' + Bcolors.ENDC
+                print Bcolors.OKBLUE + '← success' + Bcolors.ENDC
             return True # Success
 
         if debug:
@@ -418,12 +427,15 @@ class UFOSighting(object):
     def geocode(self, debug=False):
         '''
         Updates self.latitude and self.longitude if a geocode is successsful;
-        otherwise leaves them as the default (None_.
+        otherwise leaves them as the default (None).
         Uses Nominatim.
         Returns False if the location could not be geocoded, returns True when
         the geocode is sucessful.
+
+        Tip: use geocode=False when instantiating, and then do a batch geocode
+        using multiple threads with multiprocessing!
         '''
-        if self.location is None:
+        if not self.location:
             return False
 
         location = self.location
@@ -550,10 +562,10 @@ def get_all_sightings_as_list_of_UFOSighting_objects(
 
     sightings = []
 
-    year_of_sightings = BeautifulSoup(urlopen(link))
-
-    for table in year_of_sightings.findAll('table', {'cellpadding': '3'}):
-        source = link
+    for table in BeautifulSoup(urlopen(link)).findAll(
+            'table',
+            {'cellpadding': '3'}
+        ):
         date = return_next_html_elem(table, 'Date')
         time = return_next_html_elem(table, 'Time')
         location = return_next_html_elem(table, 'Location')
@@ -566,14 +578,16 @@ def get_all_sightings_as_list_of_UFOSighting_objects(
         # they are <br> tags.
         if description is not None and description.strip():
             description_with_breaks = ''
-            split_description = [d for d in description.split('.') if d is not None and d.strip()]
+            split_description = [d for d in description.split('.') if d is not \
+            None and d.strip()]
             for i, d in enumerate(split_description[:-1]):
                 if split_description[i+1][0].isalpha():
                     d += '.<br><br>'
                 description_with_breaks += d
-                description = description_with_breaks + split_description[-1] + '.'
+                description = description_with_breaks
+                description += split_description[-1] + '.'
 
-        ufo = UFOSighting(source, date, time, location, features, description)
+        ufo = UFOSighting(link, date, time, location, features, description)
 
         if not ufo.is_valid():
             # Ignore UFO sightings that have been misidentified
@@ -619,18 +633,30 @@ def export_ufos_to_geojson(list_of_UFOSighting_objects):
     Given a list of all the UFO sightings found on the website as UFOSighting
     objects, exports them to GeoJSON. The list is sorted by date, because the
     leaflet timeslider doesn't sort on a key, and I can't work out how to do it
-    in JavaScript because it is a horrible mistake of a language. Therefore
-    it also removes observations that don't have a date.
+    in JavaScript. Therefore it also removes observations that don't have a date
     '''
-    list_of_UFOSighting_objects = [l for l in list_of_UFOSighting_objects if l is not None]
+    list_of_UFOSighting_objects = [
+        l for l in list_of_UFOSighting_objects if (
+            l is not None and l.date and l.latitude and l.longitude
+        )
+    ]
     list_of_UFOSighting_objects.sort(
         key=lambda x: x.date, reverse=False
     )
     fc = FeatureCollection(
         [ufo.__geojson__() for ufo in list_of_UFOSighting_objects]
     )
-    with open(os.path.join(os.path.dirname(__file__),'ufos_data.geojson'),'w') as outfile:
+    with open(os.path.join(os.path.dirname(__file__), 'ufos_data.geojson'),
+        'w') as outfile:
         json.dump(fc, outfile)
+
+def geocode_worker(sighting):
+    '''
+    A single geocoding worker, to be run in its own wee process... and probably
+    rate-limited
+    '''
+    sighting.geocode(debug=True)
+    return sighting
 
 def main(debug=False):
     '''Main loop'''
@@ -665,20 +691,30 @@ def main(debug=False):
         'http://www.ufocusnz.org.nz/content/1957-1968---Silver-Bullet-Bursts-Through-Antarctic-Ice/106.aspx'
     ]
     additional_links = [BeautifulSoup(str('<a href="{}">Link</a>'.format(li))).findAll(href=True)[0] for li in additional_links]
-    # TODO see here for more, although they conform less to the expected structure
+    # NOTE see here for more, although they conform less to the expected structure
     # http://www.ufocusnz.org.nz/content/Aviation/80.aspx
 
     links += additional_links
+
     links = set([l['href'] for l in links])
+
+    # TODO caching
 
     # Flatten lists of UFOs for each link
     all_sightings = reduce(
         lambda x, y: x+y, [
             get_all_sightings_as_list_of_UFOSighting_objects(
-                link, geocode=True, debug=debug
+                link, geocode=False, debug=debug
             ) for link in links
         ]
     )
+
+    import multiprocessing
+
+    pool = multiprocessing.Pool(
+        processes=max(multiprocessing.cpu_count() - 2, 1)
+    )
+    pool.map(geocode_worker, all_sightings)
 
     # export_ufos_to_csv(all_sightings)
     export_ufos_to_geojson(all_sightings)
