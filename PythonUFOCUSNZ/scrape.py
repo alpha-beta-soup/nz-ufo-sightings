@@ -18,6 +18,7 @@ import re
 import string
 import os
 import HTMLParser
+import multiprocessing
 
 # pylint: disable=import-error
 from BeautifulSoup import BeautifulSoup
@@ -341,6 +342,7 @@ class UFOSighting(object):
         # __init__ as nominatim needs to query a REST API
         self.latitude = None
         self.longitude = None
+        self.haslocation = None # Unknown state
         self.geocoded_to = ""
         self.geocode_attempts = 1
         self.already_attempted = set([])
@@ -362,7 +364,7 @@ class UFOSighting(object):
     def __geojson__(
         self, exclude=['longitude', 'latitude', 'already_attempted']):
         h = HTMLParser.HTMLParser()
-        if not (self.longitude and self.latitude):
+        if not self.haslocation:
             return None
         return Feature(
             geometry=Point((self.longitude, self.latitude)),
@@ -398,8 +400,7 @@ class UFOSighting(object):
         if location in self.already_attempted:
             return None
         self.already_attempted.add(location)
-        if location == '':
-            self.latitude, self.longitude = None, None
+        if not location:
             return False # Failure
         # Strip non-alpha characters at end of location
         location = strip_nonalpha_at_end(location)
@@ -412,6 +413,7 @@ class UFOSighting(object):
             geocoded = self.attempt_geocode(location)
 
         if geocoded is not None:
+            self.haslocation = True
             self.latitude = geocoded.latitude
             self.longitude = geocoded.longitude
             self.geocoded_to = location
@@ -419,6 +421,8 @@ class UFOSighting(object):
                 print self.latitude, self.longitude,
                 print Bcolors.OKBLUE + '← success' + Bcolors.ENDC
             return True # Success
+        else:
+            self.haslocation = False
 
         if debug:
             print Bcolors.FAIL + '← fail' + Bcolors.ENDC
@@ -635,16 +639,20 @@ def export_ufos_to_geojson(list_of_UFOSighting_objects):
     leaflet timeslider doesn't sort on a key, and I can't work out how to do it
     in JavaScript. Therefore it also removes observations that don't have a date
     '''
-    list_of_UFOSighting_objects = [
-        l for l in list_of_UFOSighting_objects if (
-            l is not None and l.date and l.latitude and l.longitude
-        )
-    ]
+    print list_of_UFOSighting_objects
+    list_of_UFOSighting_objects = [l for l in list_of_UFOSighting_objects if l is not None]
+    print list_of_UFOSighting_objects
+    list_of_UFOSighting_objects = [l for l in list_of_UFOSighting_objects if l.date]
+    print list_of_UFOSighting_objects
+    # list_of_UFOSighting_objects = [l for l in list_of_UFOSighting_objects if l.longitude is not None]
+    # print list_of_UFOSighting_objects
+    # list_of_UFOSighting_objects = [l for l in list_of_UFOSighting_objects if l.latitude is not None]
+    # print list_of_UFOSighting_objects
     list_of_UFOSighting_objects.sort(
         key=lambda x: x.date, reverse=False
     )
     fc = FeatureCollection(
-        [ufo.__geojson__() for ufo in list_of_UFOSighting_objects]
+        [ufo.__geojson__() for ufo in list_of_UFOSighting_objects if ufo.haslocation]
     )
     with open(os.path.join(os.path.dirname(__file__), 'ufos_data.geojson'),
         'w') as outfile:
@@ -709,15 +717,13 @@ def main(debug=False):
         ]
     )
 
-    import multiprocessing
-
     pool = multiprocessing.Pool(
         processes=max(multiprocessing.cpu_count() - 2, 1)
     )
-    pool.map(geocode_worker, all_sightings)
+    results = pool.map(geocode_worker, all_sightings)
 
-    # export_ufos_to_csv(all_sightings)
-    export_ufos_to_geojson(all_sightings)
+    # export_ufos_to_csv(results)
+    export_ufos_to_geojson(results)
 
 if __name__ == '__main__':
     main(debug=True)
