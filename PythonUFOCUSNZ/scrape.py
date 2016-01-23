@@ -639,15 +639,8 @@ def export_ufos_to_geojson(list_of_UFOSighting_objects):
     leaflet timeslider doesn't sort on a key, and I can't work out how to do it
     in JavaScript. Therefore it also removes observations that don't have a date
     '''
-    print list_of_UFOSighting_objects
     list_of_UFOSighting_objects = [l for l in list_of_UFOSighting_objects if l is not None]
-    print list_of_UFOSighting_objects
     list_of_UFOSighting_objects = [l for l in list_of_UFOSighting_objects if l.date]
-    print list_of_UFOSighting_objects
-    # list_of_UFOSighting_objects = [l for l in list_of_UFOSighting_objects if l.longitude is not None]
-    # print list_of_UFOSighting_objects
-    # list_of_UFOSighting_objects = [l for l in list_of_UFOSighting_objects if l.latitude is not None]
-    # print list_of_UFOSighting_objects
     list_of_UFOSighting_objects.sort(
         key=lambda x: x.date, reverse=False
     )

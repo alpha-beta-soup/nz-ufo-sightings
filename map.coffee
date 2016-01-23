@@ -83,6 +83,7 @@ get_attribution = ->
   attribution = "UFO data © <a href='#{ufocus_web}'>#{ufocus}</a>"
   attribution += " | <a href='#{github}')>Github</a>"
   attribution += " | <a href='#{twitter}'>Twitter</a>"
+  attribution += " | Locations approximate, may be way off!"
   return attribution
 
 credits = L.control.attribution().addTo(map)
