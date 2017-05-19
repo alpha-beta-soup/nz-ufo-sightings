@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-
 '''
 Script to parse UFO reports from UFOcusNZ
 
@@ -23,17 +22,13 @@ import multiprocessing
 # pylint: disable=import-error
 from BeautifulSoup import BeautifulSoup
 import pandas as pd
-from geopy.geocoders import (
-    Nominatim
-    # OpenMapQuest
-)
+from geopy.geocoders import (Nominatim
+                             # OpenMapQuest
+                             )
 from geopy.exc import GeocoderTimedOut
 import json
-from geojson import (
-    Point,
-    Feature,
-    FeatureCollection
-)
+from geojson import (Point, Feature, FeatureCollection)
+
 
 def handle_special_date_exception(date_string, exc):
     '''
@@ -51,23 +46,27 @@ def handle_special_date_exception(date_string, exc):
     deliberately lost as I can't yet be bothered considering that as a
     possibility.
     '''
-    exceptions = {'Monday 17 or Tuesday 18 May 2010': '17 May 2010',
-    'Sunday 26 Sept 2010': '26 September 2010',
-    'late October 2010': '27 October 2010',
-    'first week of November': '1 November 2010',
-    'between 1-8 June 2013': '1 June 2013',
-    'week of 12-14 May 2014': '12 May 2014',
-    '21 Octover 2014': '21 October 2014',
-    'early May 2015': '3 May 2015',
-    'Late August or early September, 1971': '31 august 1971',
-    'Last quarter of 1999': '15 November 1999',
-    'Exact date unknown; between 1957 and 1968': '1 January 1957'}
+    exceptions = {
+        'Monday 17 or Tuesday 18 May 2010': '17 May 2010',
+        'Sunday 26 Sept 2010': '26 September 2010',
+        'late October 2010': '27 October 2010',
+        'first week of November': '1 November 2010',
+        'between 1-8 June 2013': '1 June 2013',
+        'week of 12-14 May 2014': '12 May 2014',
+        '21 Octover 2014': '21 October 2014',
+        'early May 2015': '3 May 2015',
+        'Late August or early September, 1971': '31 august 1971',
+        'Last quarter of 1999': '15 November 1999',
+        'Exact date unknown; between 1957 and 1968': '1 January 1957',
+        'mid October 2013': '15 October 2013'
+    }
     if date_string.strip() in exceptions.keys():
         return exceptions[date_string.strip()]
     else:
         err = 'dateutil could not parse "{}"'.format(date_string)
         print '\n{error}\n'.format(error=err)
         raise exc
+
 
 def parse_date(date_string):
     '''
@@ -77,8 +76,7 @@ def parse_date(date_string):
         date_string = date_string.replace('NEW', '').strip()
         # date_string = filter(lambda x: x in string.printable, date_string)
         date_string = ''.join(
-            [item for item in date_string if item in string.printable]
-        )
+            [item for item in date_string if item in string.printable])
         try:
             date_string = dateutil.parser.parse(date_string)
         # pylint: disable=broad-except
@@ -87,18 +85,16 @@ def parse_date(date_string):
             date_string = parse_date(date_string)
     return date_string
 
+
 # pylint: disable=too-many-return-statements
-def return_next_html_elem(soup, sighting_property, to_find='td', pattern='{}:'):
+def return_next_html_elem(soup, sighting_property, to_find='td',
+                          pattern='{}:'):
     '''
     Returns the subsequent HTML `to_find` element after <sighting_property>
     '''
     assert sighting_property in [
-        'Date',
-        'Time',
-        'Location',
-        'Features/characteristics',
-        'Special features/characteristics',
-        'Description'
+        'Date', 'Time', 'Location', 'Features/characteristics',
+        'Special features/characteristics', 'Description'
     ]
     assert soup is not None
 
@@ -111,28 +107,24 @@ def return_next_html_elem(soup, sighting_property, to_find='td', pattern='{}:'):
 
         # Sometimes it's "special"
         if sighting_property == 'Features/characteristics':
-            return return_next_html_elem(
-                soup, 'Special features/characteristics'
-            )
+            return return_next_html_elem(soup,
+                                         'Special features/characteristics')
 
         # Sometimes the colon is left off
         if ':' in pattern:
             pattern = '{}'
             return return_next_html_elem(
-                soup, sighting_property, to_find=to_find, pattern=pattern
-            )
+                soup, sighting_property, to_find=to_find, pattern=pattern)
 
         # Try with a strong tag
         if to_find != 'strong' and to_find != 'span':
             return return_next_html_elem(
-            soup, sighting_property, to_find='strong'
-        )
+                soup, sighting_property, to_find='strong')
 
         # Try with a span tag
         if to_find != 'span':
             return return_next_html_elem(
-            soup, sighting_property, to_find='span'
-        )
+                soup, sighting_property, to_find='span')
 
         # Sometimes the html is mangled with <br> tags
         if '<br/>' not in pattern and \
@@ -142,8 +134,8 @@ def return_next_html_elem(soup, sighting_property, to_find='td', pattern='{}:'):
                 item for item in soup.get_text().strip().split("\n") if item
             ]
             if pattern.format(sighting_property) not in text:
-                return None # Simply doesn't exist
-            return '<br>'.join(text[text.index('Description')+1:])
+                return None  # Simply doesn't exist
+            return '<br>'.join(text[text.index('Description') + 1:])
 
         # If all else fails
         return None
@@ -164,6 +156,7 @@ def return_next_html_elem(soup, sighting_property, to_find='td', pattern='{}:'):
         result = unicode(result).encode('utf8')
 
     return result
+
 
 def substitutions_for_known_issues(locations):
     '''
@@ -186,7 +179,7 @@ def substitutions_for_known_issues(locations):
         'Takapuna Beach': 'Takapuna',
         'Golden Springs, Reporoa, Bay of Plenty': 'Reporoa',
         'Puketona Junction, south of Kerikeri, New Zealand':
-            'Te Ahu Ahu Road, New Zealand', # Manually checked
+        'Te Ahu Ahu Road, New Zealand',  # Manually checked
         # Ohinepaka not in OSM; this is nearest landmark
         'Ohinepaka, Wairoa': 'Kiwi Valley Road, Wairoa',
         'Gluepot Road, Oropi': 'Gluepot Road',
@@ -236,6 +229,7 @@ def substitutions_for_known_issues(locations):
             if k in loc:
                 yield loc.replace(k, corrections[k])
 
+
 def strip_nonalpha_at_end(location):
     '''
     Remove non-letter characters at the end of the string
@@ -250,9 +244,10 @@ def strip_nonalpha_at_end(location):
                 return loc
     return loc
 
+
 # pylint: disable=dangerous-default-value
 def strip_conjunctions_at_start(
-    location, conjunctions=['of', 'to', 'and', 'from', 'between']):
+        location, conjunctions=['of', 'to', 'and', 'from', 'between']):
     '''
     Removes conjunctions at the start of a string.
     '''
@@ -262,10 +257,11 @@ def strip_conjunctions_at_start(
         else:
             yield location
 
+
 # pylint: disable=anomalous-backslash-in-string
 # pylint: disable=invalid-name
 def return_location_without_non_title_case_and_short_words(
-    location, short=1, pattern='\W*\b\w{{short}}\b'):
+        location, short=1, pattern='\W*\b\w{{short}}\b'):
     '''
     Does what it says, useful to remove guff from a string representing a
     location, which frequently improves poor geocoding.
@@ -276,6 +272,7 @@ def return_location_without_non_title_case_and_short_words(
     for sub in match:
         location = location.replace(sub, '')
     return location
+
 
 # pylint: disable=anomalous-backslash-in-string
 def yield_locations_without_symbol(location, pattern, symbol):
@@ -295,9 +292,10 @@ def yield_locations_without_symbol(location, pattern, symbol):
         for sub in m.split(symbol):
             yield location.replace(m, sub)
 
+
 # pylint: disable=anomalous-backslash-in-string
-def return_location_without_bracketed_clause(
-    location, pattern='\s\([\w\s]+\)'):
+def return_location_without_bracketed_clause(location,
+                                             pattern='\s\([\w\s]+\)'):
     '''
     Returns location without a bracketed clause:
     >>> loc = 'Manukau (near Auckland airport), Auckland, New Zealand'
@@ -308,6 +306,7 @@ def return_location_without_bracketed_clause(
         return location
     pattern = re.compile(pattern)
     return pattern.sub('', location)
+
 
 # pylint: disable=no-init
 # pylint: disable=too-few-public-methods
@@ -324,25 +323,27 @@ class Bcolors(object):
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
 
+
 # pylint: disable=too-many-instance-attributes
 class UFOSighting(object):
     '''
     Object representing a UFO sightning, with a URL, date, time, location, some
     features, a text description, and geocoding metadata.
     '''
+
     # pylint: disable=too-many-arguments
     def __init__(self, source, date, time, location, features, description):
-        self.source = source # Link to page
-        self.date = parse_date(date) # Python date
-        self.time = time # String time
-        self.location = location # String location (will be used in geocode)
+        self.source = source  # Link to page
+        self.date = parse_date(date)  # Python date
+        self.time = time  # String time
+        self.location = location  # String location (will be used in geocode)
         self.features = features
         self.description = description
         # These can be updated by calling geocode(); but don't do that in
         # __init__ as nominatim needs to query a REST API
         self.latitude = None
         self.longitude = None
-        self.haslocation = None # Unknown state
+        self.haslocation = None  # Unknown state
         self.geocoded_to = ""
         self.geocode_attempts = 1
         self.already_attempted = set([])
@@ -355,14 +356,12 @@ class UFOSighting(object):
         return text
 
     def __tuple__(self):
-        return (
-            self.date, self.time, self.location, self.geocoded_to,
-            self.geocode_attempts, self.latitude, self.longitude,
-            self.features, self.description
-        )
+        return (self.date, self.time, self.location, self.geocoded_to,
+                self.geocode_attempts, self.latitude, self.longitude,
+                self.features, self.description)
 
-    def __geojson__(
-        self, exclude=['longitude', 'latitude', 'already_attempted']):
+    def __geojson__(self,
+                    exclude=['longitude', 'latitude', 'already_attempted']):
         h = HTMLParser.HTMLParser()
         if not self.haslocation:
             return None
@@ -383,9 +382,12 @@ class UFOSighting(object):
                 return True
         return False
 
-    def attempt_geocode(self, location,
-        bias='New Zealand', timeout=6, exactly_one=True, debug=True
-        ):
+    def attempt_geocode(self,
+                        location,
+                        bias='New Zealand',
+                        timeout=6,
+                        exactly_one=True,
+                        debug=True):
         '''
         Attempts a geocode, returning None, False, or True acccording
         to whether or not the operation is successful, or not, or somehow
@@ -401,7 +403,7 @@ class UFOSighting(object):
             return None
         self.already_attempted.add(location)
         if not location:
-            return False # Failure
+            return False  # Failure
         # Strip non-alpha characters at end of location
         location = strip_nonalpha_at_end(location)
         if debug:
@@ -420,13 +422,13 @@ class UFOSighting(object):
             if debug:
                 print self.latitude, self.longitude,
                 print Bcolors.OKBLUE + '← success' + Bcolors.ENDC
-            return True # Success
+            return True  # Success
         else:
             self.haslocation = False
 
         if debug:
             print Bcolors.FAIL + '← fail' + Bcolors.ENDC
-        return None # No result, but there are more options to try
+        return None  # No result, but there are more options to try
 
     def geocode(self, debug=False):
         '''
@@ -464,10 +466,8 @@ class UFOSighting(object):
 
         # North Island and South Island are not useful to the geocoder
         for island in [
-            'North Island', 'South Island',
-            'NI', 'SI',
-            'Nth Island', 'Sth Island',
-            'North Is', 'South Is'
+                'North Island', 'South Island', 'NI', 'SI', 'Nth Island',
+                'Sth Island', 'North Is', 'South Is'
         ]:
             if not strip_nonalpha_at_end(location).endswith(island) and not \
             strip_nonalpha_at_end(location).endswith(island + ', New Zealand'):
@@ -500,9 +500,8 @@ class UFOSighting(object):
             # If there's a slash in the name, split it into two attempts
             attempts_copy = self.already_attempted.copy()
             for loc in attempts_copy:
-                for loc in yield_locations_without_symbol(
-                    loc, '(\w*/[\w\s]*)', '/'
-                ):
+                for loc in yield_locations_without_symbol(loc, '(\w*/[\w\s]*)',
+                                                          '/'):
                     gc = self.attempt_geocode(loc)
                     if gc is not None:
                         return gc
@@ -511,19 +510,16 @@ class UFOSighting(object):
             attempts_copy = self.already_attempted.copy()
             for loc in attempts_copy:
                 for loc in yield_locations_without_symbol(
-                    loc, '(\w*\s&amp;\s\w*)', '*'
-                ):
+                        loc, '(\w*\s&amp;\s\w*)', '*'):
                     gc = self.attempt_geocode(loc)
                     if gc is not None:
                         return gc
-
 
             # Try without a bracketed clause
             attempts_copy = self.already_attempted.copy()
             for loc in attempts_copy:
                 gc = self.attempt_geocode(
-                    return_location_without_bracketed_clause(loc)
-                )
+                    return_location_without_bracketed_clause(loc))
                 if gc is not None:
                     return gc
 
@@ -551,8 +547,10 @@ class UFOSighting(object):
 
             # While loop repeats
 
-def get_all_sightings_as_list_of_UFOSighting_objects(
-    link, geocode=True, debug=True):
+
+def get_all_sightings_as_list_of_UFOSighting_objects(link,
+                                                     geocode=True,
+                                                     debug=True):
     '''
     Returns a list of UFOSighting objects, scraped from one link to a page of
     sighting reports.
@@ -566,16 +564,12 @@ def get_all_sightings_as_list_of_UFOSighting_objects(
 
     sightings = []
 
-    for table in BeautifulSoup(urlopen(link)).findAll(
-            'table',
-            {'cellpadding': '3'}
-        ):
+    for table in BeautifulSoup(urlopen(link)).findAll('table',
+                                                      {'cellpadding': '3'}):
         date = return_next_html_elem(table, 'Date')
         time = return_next_html_elem(table, 'Time')
         location = return_next_html_elem(table, 'Location')
-        features = return_next_html_elem(
-            table, 'Features/characteristics'
-        )
+        features = return_next_html_elem(table, 'Features/characteristics')
         description = return_next_html_elem(table, 'Description')
 
         # Work-around to re-build paragraph breaks, which get lost because
@@ -585,7 +579,7 @@ def get_all_sightings_as_list_of_UFOSighting_objects(
             split_description = [d for d in description.split('.') if d is not \
             None and d.strip()]
             for i, d in enumerate(split_description[:-1]):
-                if split_description[i+1][0].isalpha():
+                if split_description[i + 1][0].isalpha():
                     d += '.<br><br>'
                 description_with_breaks += d
                 description = description_with_breaks
@@ -607,6 +601,7 @@ def get_all_sightings_as_list_of_UFOSighting_objects(
 
     return sightings
 
+
 def export_ufos_to_csv(list_of_UFOSighting_objects):
     '''
     Given a list of all the UFO sightings found on the website as UFOSighting
@@ -614,23 +609,25 @@ def export_ufos_to_csv(list_of_UFOSighting_objects):
     '''
     # Convert UFO objects to tuples
     all_sightings_as_tuples = [
-        ufo.__tuple__() for ufo in list_of_UFOSighting_objects]
+        ufo.__tuple__() for ufo in list_of_UFOSighting_objects
+    ]
 
     # Create a pandas DataFrame from the list of tuples
-    ufos_df = pd.DataFrame(all_sightings_as_tuples, columns=[
-        'Date', 'Time', 'Location', 'Geocoded As', 'Geocode Attempts',
-        'Latitude', 'Longitude', 'Features', 'Description'
-    ])
+    ufos_df = pd.DataFrame(
+        all_sightings_as_tuples,
+        columns=[
+            'Date', 'Time', 'Location', 'Geocoded As', 'Geocode Attempts',
+            'Latitude', 'Longitude', 'Features', 'Description'
+        ])
 
     # Export the pandas DF to CSV
     ufos_df.to_csv(
-        os.path.join(
-            os.path.dirname(__file__),
-            'ufos_data.csv'
-        ), index=False, encoding='utf-8'
-    )
+        os.path.join(os.path.dirname(__file__), 'ufos_data.csv'),
+        index=False,
+        encoding='utf-8')
 
     return None
+
 
 def export_ufos_to_geojson(list_of_UFOSighting_objects):
     '''
@@ -639,17 +636,22 @@ def export_ufos_to_geojson(list_of_UFOSighting_objects):
     leaflet timeslider doesn't sort on a key, and I can't work out how to do it
     in JavaScript. Therefore it also removes observations that don't have a date
     '''
-    list_of_UFOSighting_objects = [l for l in list_of_UFOSighting_objects if l is not None]
-    list_of_UFOSighting_objects = [l for l in list_of_UFOSighting_objects if l.date]
-    list_of_UFOSighting_objects.sort(
-        key=lambda x: x.date, reverse=False
-    )
-    fc = FeatureCollection(
-        [ufo.__geojson__() for ufo in list_of_UFOSighting_objects if ufo.haslocation]
-    )
-    with open(os.path.join(os.path.dirname(__file__), 'ufos_data.geojson'),
-        'w') as outfile:
+    list_of_UFOSighting_objects = [
+        l for l in list_of_UFOSighting_objects if l is not None
+    ]
+    list_of_UFOSighting_objects = [
+        l for l in list_of_UFOSighting_objects if l.date
+    ]
+    list_of_UFOSighting_objects.sort(key=lambda x: x.date, reverse=False)
+    fc = FeatureCollection([
+        ufo.__geojson__() for ufo in list_of_UFOSighting_objects
+        if ufo.haslocation
+    ])
+    with open(
+            os.path.join(os.path.dirname(__file__), 'ufos_data.geojson'),
+            'w') as outfile:
         json.dump(fc, outfile)
+
 
 def geocode_worker(sighting):
     '''
@@ -659,8 +661,10 @@ def geocode_worker(sighting):
     sighting.geocode(debug=True)
     return sighting
 
+
 def main(debug=False):
     '''Main loop'''
+
     def valid(tag):
         '''
         <tag> = an html tag that has an href
@@ -677,8 +681,7 @@ def main(debug=False):
     # Get list of valid links from home page
     # There is one for each year
     links = sorted(
-        set([li for li in home_page.findAll(href=True) if valid(li)])
-    )
+        set([li for li in home_page.findAll(href=True) if valid(li)]))
 
     # There are some other links scattered around the website that have
     # reports in the same format
@@ -691,7 +694,10 @@ def main(debug=False):
         'http://www.ufocusnz.org.nz/content/1974---Large-Object-Emerges-from-Sea-off-Aranga-Beach,-Northland/105.aspx',
         'http://www.ufocusnz.org.nz/content/1957-1968---Silver-Bullet-Bursts-Through-Antarctic-Ice/106.aspx'
     ]
-    additional_links = [BeautifulSoup(str('<a href="{}">Link</a>'.format(li))).findAll(href=True)[0] for li in additional_links]
+    additional_links = [
+        BeautifulSoup(str('<a href="{}">Link</a>'.format(li))).findAll(
+            href=True)[0] for li in additional_links
+    ]
     # NOTE see here for more, although they conform less to the expected structure
     # http://www.ufocusnz.org.nz/content/Aviation/80.aspx
 
@@ -703,20 +709,18 @@ def main(debug=False):
 
     # Flatten lists of UFOs for each link
     all_sightings = reduce(
-        lambda x, y: x+y, [
+        lambda x, y: x + y, [
             get_all_sightings_as_list_of_UFOSighting_objects(
-                link, geocode=False, debug=debug
-            ) for link in links
-        ]
-    )
+                link, geocode=False, debug=debug) for link in links
+        ])
 
     pool = multiprocessing.Pool(
-        processes=max(multiprocessing.cpu_count() - 2, 1)
-    )
+        processes=max(multiprocessing.cpu_count() - 2, 1))
     results = pool.map(geocode_worker, all_sightings)
 
     # export_ufos_to_csv(results)
     export_ufos_to_geojson(results)
+
 
 if __name__ == '__main__':
     main(debug=True)
